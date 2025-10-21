@@ -1,0 +1,16 @@
+{
+  "name": "legion-roman-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Roman Legion Minecraft clan",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
