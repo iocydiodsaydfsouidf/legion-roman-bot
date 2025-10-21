@@ -175,3 +175,24 @@ app.listen(PORT, () => {
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Добавьте эту команду в существующий код
+bot.command('getid', (ctx) => {
+  const chatId = ctx.chat.id;
+  const chatType = ctx.chat.type;
+  const chatTitle = ctx.chat.title || 'Личные сообщения';
+  
+  return ctx.reply(`
+📋 ИНФОРМАЦИЯ О ЧАТЕ:
+
+💬 Название: ${chatTitle}
+🆔 Chat ID: \`${chatId}\`
+📁 Тип: ${chatType}
+
+⚠️ Скопируйте этот ID для настройки переменной CHAT_ID в Railway
+  `.trim(), { parse_mode: 'Markdown' });
+});
+
+// Также добавьте обработку всех сообщений для отладки
+bot.on('message', (ctx) => {
+  console.log('Получено сообщение в чате:', ctx.chat.id, 'Название:', ctx.chat.title);
+});
