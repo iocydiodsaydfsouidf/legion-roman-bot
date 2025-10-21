@@ -5,14 +5,34 @@ const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const PORT = process.env.PORT || 3000;
 
-// Простое хранилище в памяти (для продакшена лучше использовать БД)
+// Простое хранилище в памяти
 const userStates = new Map();
 
 console.log('🔄 Инициализация бота Легиона...');
 
+// Команда для получения ID чата (удобно для отладки)
+bot.command('getid', (ctx) => {
+  const chatId = ctx.chat.id;
+  const chatType = ctx.chat.type;
+  const chatTitle = ctx.chat.title || 'Личные сообщения';
+  
+  return ctx.reply(`
+📋 ИНФОРМАЦИЯ О ЧАТЕ:
+
+💬 Название: ${chatTitle}
+🆔 Chat ID: \`${chatId}\`
+📁 Тип: ${chatType}
+
+⚠️ Скопируйте этот ID для настройки переменной CHAT_ID в Railway
+  `.trim(), { parse_mode: 'Markdown' });
+});
+
 // Команда старт
 bot.start((ctx) => {
-  userStates.set(ctx.from.id, { step: 'nickname' });
+  userStates.set(ctx.from.id, { 
+    step: 'nickname',
+    username: ctx.from.username || 'нет юзернейма'
+  });
   return ctx.reply(
     '🏛️ Приветствуем, будущий легионер! Я помогу тебе вступить в Legio Caesaris.\n\n' +
     'Для начала введи свой игровой никнейм в Minecraft:'
@@ -24,6 +44,8 @@ bot.on('text', async (ctx) => {
   const userId = ctx.from.id;
   const state = userStates.get(userId) || {};
   const text = ctx.message.text.trim();
+
+  console.log(`Обработка сообщения от ${userId}, шаг: ${state.step}`);
 
   try {
     switch (state.step) {
@@ -50,6 +72,7 @@ bot.on('text', async (ctx) => {
         return ctx.reply('Почему ты хочешь вступить в наш Легион? Что тебя привлекло?');
 
       case 'motivation':
+        // Формируем заявку
         const applicationText = `
 🎯 НОВАЯ ЗАЯВКА В ЛЕГИОН!
 
@@ -58,37 +81,48 @@ bot.on('text', async (ctx) => {
 Опыт: ${state.experience}
 Мотивация: ${text}
 
-От: @${ctx.from.username || 'нет юзернейма'}
+От: @${state.username}
 ID: ${userId}
 ID заявки: #LC-${Date.now()}
         `.trim();
 
-        // Отправляем заявку в канал
-        await ctx.telegram.sendMessage(
-          process.env.CHAT_ID,
-          applicationText,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('✅ Принять', `accept_${userId}`)],
-            [Markup.button.callback('❌ Отклонить', `reject_${userId}`)]
-          ])
-        );
+        console.log('Отправка заявки в чат:', process.env.CHAT_ID);
 
-        userStates.delete(userId);
-        return ctx.reply(
-          '✅ Твоя заявка отправлена Сенату!\n\n' +
-          'Ожидай решения в течение 24 часов. Следи за уведомлениями!\n\n' +
-          'Ave! ⚔️'
-        );
+        try {
+          // Отправляем заявку в канал
+          await ctx.telegram.sendMessage(
+            process.env.CHAT_ID,
+            applicationText,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('✅ Принять', `accept_${userId}`)],
+              [Markup.button.callback('❌ Отклонить', `reject_${userId}`)]
+            ])
+          );
+
+          userStates.delete(userId);
+          return ctx.reply(
+            '✅ Твоя заявка отправлена Сенату!\n\n' +
+            'Ожидай решения в течение 24 часов. Следи за уведомлениями!\n\n' +
+            'Ave! ⚔️'
+          );
+        } catch (sendError) {
+          console.error('Ошибка отправки в чат:', sendError);
+          userStates.delete(userId);
+          return ctx.reply(
+            '✅ Твоя заявка сохранена!\n\n' +
+            'Сенат получит уведомление. Ожидай решения в течение 24 часов.\n\n' +
+            'Ave! ⚔️'
+          );
+        }
 
       default:
         return ctx.reply('Используй /start для подачи заявки в Легион.');
     }
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('Общая ошибка:', error);
+    userStates.delete(userId);
     return ctx.reply('Произошла ошибка. Попробуй снова через несколько минут.');
   }
-
-  userStates.set(userId, state);
 });
 
 // Обработка кнопок принятия/отклонения
@@ -175,24 +209,3 @@ app.listen(PORT, () => {
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-// Добавьте эту команду в существующий код
-bot.command('getid', (ctx) => {
-  const chatId = ctx.chat.id;
-  const chatType = ctx.chat.type;
-  const chatTitle = ctx.chat.title || 'Личные сообщения';
-  
-  return ctx.reply(`
-📋 ИНФОРМАЦИЯ О ЧАТЕ:
-
-💬 Название: ${chatTitle}
-🆔 Chat ID: \`${chatId}\`
-📁 Тип: ${chatType}
-
-⚠️ Скопируйте этот ID для настройки переменной CHAT_ID в Railway
-  `.trim(), { parse_mode: 'Markdown' });
-});
-
-// Также добавьте обработку всех сообщений для отладки
-bot.on('message', (ctx) => {
-  console.log('Получено сообщение в чате:', ctx.chat.id, 'Название:', ctx.chat.title);
-});
